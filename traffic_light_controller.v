@@ -37,6 +37,7 @@ parameter RED_SEG = 8'b10001000;
 parameter YELLOW_SEG = 8'b10011001;
 parameter GREEN_SEG = 8'b10000010;
 parameter ERROR_SEG = 8'b10000000;
+parameter OFF_SEG = 8'b11111111;
 
 // States and Counters
 reg [2:0] state;
@@ -44,6 +45,17 @@ reg [2:0] next_state;
 reg [31:0] counter;
 reg ns_ped_pressed;
 reg ew_ped_pressed;
+reg flash;
+
+// Initialize variables to ensure there isn't like garbage in it
+initial begin
+	state <= INIT;
+	next_state <= NS_GO;
+	counter <= 0;
+	ns_ped_pressed <= 0;
+	ew_ped_pressed <= 0;
+	flash <= 0;
+end
 
 // State Transition
 always @ (posedge clk or posedge reset or posedge ns_pedestrian or posedge ew_pedestrian) begin
@@ -59,14 +71,24 @@ always @ (posedge clk or posedge reset or posedge ns_pedestrian or posedge ew_pe
 	end else begin
 		// Check switches
 		if (error == 1) begin
-			state <= ERROR;
-			
-			if (counter == ERROR_TIME) counter <= 0;
+			if (state != ERROR) begin
+				state <= ERROR;
+				flash <= 0;
+				counter <= 0;
+			end else if (counter >= ERROR_TIME) begin 
+				counter <= 0;
+				flash <= ~flash;
+			end
 		end
 		else if (four_way_stop == 1) begin
-			state <= FOUR_WAY;
-			
-			if (counter == FOUR_WAY_TIME) counter <= 0;
+			if (state != FOUR_WAY) begin
+				state <= FOUR_WAY;
+				flash <= 0;
+				counter <= 0;
+			end else if (counter >= FOUR_WAY_TIME) begin 
+				counter <= 0;
+				flash <= ~flash;
+			end
 		end
 	
 		if ((state == ERROR) && (error == 0)) begin
@@ -140,17 +162,17 @@ always @ (*) begin
 		end
 		FOUR_WAY: begin
 			// If the light is currently YELLOW, switch off. Otherwise, turn YELLOW
-			if (counter == FOUR_WAY_TIME) begin
-				ns_light = (ns_light == YELLOW_SEG) ? 8'b11111111 : YELLOW_SEG;
-				ew_light = (ew_light == YELLOW_SEG) ? 8'b11111111 : YELLOW_SEG;
-			end
+			ns_light = (flash == 1) ? OFF_SEG : YELLOW_SEG;
+			ew_light = (flash == 1) ? OFF_SEG : YELLOW_SEG;
 		end
 		ERROR: begin
 			// If the light is currently ERROR, switch off. Otherwise, turn ERROR
-			if (counter == ERROR_TIME) begin
-				ns_light = (ns_light == ERROR_SEG) ? 8'b11111111 : ERROR_SEG;
-				ew_light = (ew_light == ERROR_SEG) ? 8'b11111111 : ERROR_SEG;
-			end
+			ns_light = (flash == 1) ? OFF_SEG : ERROR_SEG;
+			ew_light = (flash == 1) ? OFF_SEG : ERROR_SEG;
+		end
+		default: begin
+			ns_light = 8'b11111111;
+			ew_light = 8'b11111111;
 		end
 	endcase
 end
