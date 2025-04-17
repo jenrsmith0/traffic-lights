@@ -69,7 +69,7 @@ always @ (posedge clk or posedge reset or posedge ns_pedestrian or posedge ew_pe
 	end else if (ew_pedestrian) begin
 		ew_ped_pressed <= 1;
 	end else begin
-		// Check switches
+		// Check error switch
 		if (error == 1) begin
 			if (state != ERROR) begin
 				state <= ERROR;
@@ -78,8 +78,9 @@ always @ (posedge clk or posedge reset or posedge ns_pedestrian or posedge ew_pe
 			end else if (counter >= ERROR_TIME) begin 
 				counter <= 0;
 				flash <= ~flash;
-			end
+			end else counter <= counter + 1;
 		end
+		// Check four way stop switch
 		else if (four_way_stop == 1) begin
 			if (state != FOUR_WAY) begin
 				state <= FOUR_WAY;
@@ -88,14 +89,9 @@ always @ (posedge clk or posedge reset or posedge ns_pedestrian or posedge ew_pe
 			end else if (counter >= FOUR_WAY_TIME) begin 
 				counter <= 0;
 				flash <= ~flash;
-			end
-		end
-	
-		if ((state == ERROR) && (error == 0)) begin
-			state <= next_state;
-			counter <= 0;
-		end
-		else if ((state == FOUR_WAY) && (four_way_stop == 0)) begin
+			end else counter <= counter + 1;
+		// If the switches are off and our previous state was error or four way
+		end else if (((state == ERROR) || (state == FOUR_WAY)) && (error == 0)) begin
 			state <= next_state;
 			counter <= 0;
 		end
@@ -161,9 +157,9 @@ always @ (*) begin
 			ew_light = YELLOW_SEG;
 		end
 		FOUR_WAY: begin
-			// If the light is currently YELLOW, switch off. Otherwise, turn YELLOW
-			ns_light = (flash == 1) ? OFF_SEG : YELLOW_SEG;
-			ew_light = (flash == 1) ? OFF_SEG : YELLOW_SEG;
+			// If the light is currently RED, switch off. Otherwise, turn RED
+			ns_light = (flash == 1) ? OFF_SEG : RED_SEG;
+			ew_light = (flash == 1) ? OFF_SEG : RED_SEG;
 		end
 		ERROR: begin
 			// If the light is currently ERROR, switch off. Otherwise, turn ERROR
