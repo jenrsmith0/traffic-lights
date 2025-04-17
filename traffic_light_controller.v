@@ -43,32 +43,28 @@ parameter OFF_SEG = 8'b11111111;
 reg [2:0] state;
 reg [2:0] next_state;
 reg [31:0] counter;
-reg ns_ped_pressed;
-reg ew_ped_pressed;
-reg flash;
-
-// Initialize variables to ensure there isn't like garbage in it
-initial begin
-	state <= INIT;
-	next_state <= NS_GO;
-	counter <= 0;
-	ns_ped_pressed <= 0;
-	ew_ped_pressed <= 0;
-	flash <= 0;
-end
+reg ns_ped_pressed = 1'b0;
+reg ns_pedestrian_prev = 1'b0;
+reg ew_ped_pressed = 1'b0;
+reg ew_pedestrian_prev = 1'b0;
+reg flash = 1'b0;
 
 // State Transition
-always @ (posedge clk or posedge reset or posedge ns_pedestrian or posedge ew_pedestrian) begin
+always @ (posedge clk or posedge reset) begin
 	// If we are reseting, go back to INIT state
 	if (reset) begin
 		state <= INIT;
 		counter <= 0;
-	// Check if pedestrian present
-	end else if (ns_pedestrian) begin
-		ns_ped_pressed <= 1;
-	end else if (ew_pedestrian) begin
-		ew_ped_pressed <= 1;
+	// Check if pedestrian present, only store if respective light is on
 	end else begin
+		if (!ns_pedestrian_prev && ns_pedestrian) begin
+            if (state == EW_GO) ns_ped_pressed <= 1;
+        end
+        
+        if (!ew_pedestrian_prev && ew_pedestrian) begin
+            if (state == NS_GO) ew_ped_pressed <= 1;
+        end
+		
 		// Check error switch
 		if (error == 1) begin
 			if (state != ERROR) begin
@@ -91,7 +87,7 @@ always @ (posedge clk or posedge reset or posedge ns_pedestrian or posedge ew_pe
 				flash <= ~flash;
 			end else counter <= counter + 1;
 		// If the switches are off and our previous state was error or four way
-		end else if (((state == ERROR) || (state == FOUR_WAY)) && (error == 0)) begin
+		end else if (((state == ERROR) || (state == FOUR_WAY)) && ((error == 0) || (four_way_stop == 0))) begin
 			state <= next_state;
 			counter <= 0;
 		end
@@ -116,6 +112,9 @@ always @ (posedge clk or posedge reset or posedge ns_pedestrian or posedge ew_pe
 			state <= next_state;
 			counter <= 0;
 		end else counter <= counter + 1;
+		
+		ns_pedestrian_prev <= ns_pedestrian;
+		ew_pedestrian_prev <= ew_pedestrian;
 	end
 end
 
